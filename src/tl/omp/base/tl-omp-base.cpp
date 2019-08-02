@@ -517,22 +517,61 @@ namespace TL { namespace OpenMP {
                     );
         }
     }
+
+    /*
     void Base::nondeter_handler_pre(TL::PragmaCustomDirective) {
       fprintf(stderr,"Register nondeter pre\n");
     }
     void Base::nondeter_handler_post(TL::PragmaCustomDirective directive) {
       fprintf(stderr,"Register nondeter post\n");
 
-      /* Create source using C-language */
+      // Create source using C-language 
       Source nondeter_line;
       nondeter_line << "fprintf(stderr,\"I'M IN\");";
 
-      /* Parse the source code into Mercurium AST */
+      // Parse the source code into Mercurium AST 
       Nodecl::NodeclBase real_code = nondeter_line.parse_statement(directive);
 
-      /* Replace this directive by this nice code */
+      // Replace this directive by this nice code 
       directive.replace(real_code);
     }
+    */
+
+    void Base::nondeter_handler_pre(TL::PragmaCustomStatement directive)
+    {
+        if (_core.in_ompss_mode())
+        {
+            for_handler_pre(directive);
+            return;
+        }
+
+        nest_context_in_pragma(directive);
+    }
+    void Base::nondeter_handler_post(TL::PragmaCustomStatement directive)
+    {
+        if (emit_omp_report())
+        {
+            *_omp_report_file
+                << "\n"
+                << directive.get_locus_str() << ": " << "NONDETER construct\n"
+                << directive.get_locus_str() << ": " << "----------------------\n"
+                << directive.get_locus_str() << ": " << directive.get_statements().prettyprint() << "\n"
+                ;
+        }
+        if (_core.in_ompss_mode())
+        {
+            // In OmpSs this is like a simple for
+            warn_printf_at(directive.get_locus(), "explicit parallel regions do not have any effect in OmpSs\n");
+            if (emit_omp_report())
+            {
+                *_omp_report_file
+                    << OpenMP::Report::indent
+                    << "Note that in OmpSs the NONDETER part of NONDETER <ARG> is ignored\n"
+                    ;
+            }
+            for_handler_post(directive);
+            return;
+        }
 
     void Base::flush_handler_pre(TL::PragmaCustomDirective) { }
     void Base::flush_handler_post(TL::PragmaCustomDirective directive)

@@ -2700,6 +2700,7 @@ namespace TL { namespace OpenMP {
     OMP_INVALID_DECLARATION_HANDLER(teams_distribute_parallel_do)
     OMP_INVALID_DECLARATION_HANDLER(teams_distribute_parallel_for)
     OMP_INVALID_DECLARATION_HANDLER(workshare)
+    OMP_INVALID_DECLARATION_HANDLER(nondeter)
 
     OMP_INVALID_STATEMENT_HANDLER(declare_simd)
 
@@ -2713,7 +2714,7 @@ namespace TL { namespace OpenMP {
 
     OMP_EMPTY_DIRECTIVE_HANDLER(barrier)
     OMP_EMPTY_DIRECTIVE_HANDLER(flush)
-    OMP_EMPTY_DIRECTIVE_HANDLER(nondeter)
+    //OMP_EMPTY_DIRECTIVE_HANDLER(nondeter)
     OMP_EMPTY_DIRECTIVE_HANDLER(register)
     OMP_EMPTY_DIRECTIVE_HANDLER(taskyield)
     OMP_EMPTY_DIRECTIVE_HANDLER(unregister)

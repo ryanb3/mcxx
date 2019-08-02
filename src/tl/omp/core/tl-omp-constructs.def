@@ -28,7 +28,8 @@ OMP_CONSTRUCT("parallel", parallel, true)
 OMP_CONSTRUCT("parallel|for", parallel_for, IS_CXX_LANGUAGE || IS_C_LANGUAGE)
 OMP_CONSTRUCT("for", for, IS_CXX_LANGUAGE || IS_C_LANGUAGE)
 
-OMP_DIRECTIVE("nondeter", nondeter, true)
+//OMP_DIRECTIVE("nondeter", nondeter, true)
+OMP_CONSTRUCT("nondeter", nondeter, true)
 
 OMP_DIRECTIVE("barrier", barrier, true)
 OMP_CONSTRUCT_NOEND("atomic", atomic, true)

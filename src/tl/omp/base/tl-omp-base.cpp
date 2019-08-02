@@ -517,6 +517,22 @@ namespace TL { namespace OpenMP {
                     );
         }
     }
+    void Base::nondeter_handler_pre(TL::PragmaCustomDirective) {
+      fprintf(stderr,"Register nondeter pre\n");
+    }
+    void Base::nondeter_handler_post(TL::PragmaCustomDirective directive) {
+      fprintf(stderr,"Register nondeter post\n");
+
+      /* Create source using C-language */
+      Source nondeter_line;
+      nondeter_line << "fprintf(stderr,\"I'M IN\");";
+
+      /* Parse the source code into Mercurium AST */
+      Nodecl::NodeclBase real_code = nondeter_line.parse_statement(directive);
+
+      /* Replace this directive by this nice code */
+      directive.replace(real_code);
+    }
 
     void Base::flush_handler_pre(TL::PragmaCustomDirective) { }
     void Base::flush_handler_post(TL::PragmaCustomDirective directive)

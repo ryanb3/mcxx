@@ -2713,11 +2713,12 @@ namespace TL { namespace OpenMP {
 
     OMP_EMPTY_DIRECTIVE_HANDLER(barrier)
     OMP_EMPTY_DIRECTIVE_HANDLER(flush)
+    OMP_EMPTY_DIRECTIVE_HANDLER(nondeter)
     OMP_EMPTY_DIRECTIVE_HANDLER(register)
     OMP_EMPTY_DIRECTIVE_HANDLER(taskyield)
     OMP_EMPTY_DIRECTIVE_HANDLER(unregister)
-
     OMP_UNIMPLEMENTED_STATEMENT_HANDLER(ordered)
+
 
     /* --------------- OmpSs-2 ---------------- */
 

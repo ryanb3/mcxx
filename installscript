@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# this script assumes you have:
+#   1) Spack installed, alongside the Spack gperf module
+#   2) Autoreconfig installed
+
+# config and install nanox runtime library
+spack load gperf
+cd mcxx
+export MERCURIUM=$PWD/mercurium
+cd nanox-0.14.1
+autoreconf -fiv
+./configure --prefix=$MERCURIUM
+make -j64
+make install -j64
+
+# config and install mcxx compiler
+cd ..
+autoreconf -fiv
+./configure --prefix=$MERCURIUM -enable-ompss --with-nanox=$MERCURIUM
+make -j64
+make install -j64
+export PATH=$MERCURIUM/bin:$PATH
+
+# compile and run test OpenMP program with nondeter pragma
+mcc -o test --openmp mytest.c
+./test

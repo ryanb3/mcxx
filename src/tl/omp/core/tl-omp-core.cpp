@@ -1957,6 +1957,36 @@ namespace TL { namespace OpenMP {
         _openmp_info->pop_current_data_environment();
     }
 
+    void Core::nondeter_handler_pre(TL::PragmaCustomStatement construct)
+    {
+        Nodecl::NodeclBase stmt = get_statement_from_pragma(construct);
+        if (in_ompss_mode())
+        {
+            loop_handler_pre(construct, stmt, &Core::common_for_handler);
+        }
+        else
+        {
+            DataEnvironment& data_environment = _openmp_info->get_new_data_environment(construct);
+
+            if (construct.get_pragma_line().get_clause("collapse").is_defined())
+            {
+                error_printf_at(construct.get_locus(),
+                        "The 'collapse' clause should have been removed at this point\n");
+            }
+
+            _openmp_info->push_current_data_environment(data_environment);
+            ObjectList<Symbol> extra_symbols;
+            common_for_handler(construct, stmt, data_environment, extra_symbols);
+            common_parallel_handler(construct, data_environment, extra_symbols);
+            get_data_extra_symbols(data_environment, extra_symbols);
+        }
+    }
+
+    void Core::nondeter_handler_post(TL::PragmaCustomStatement construct)
+    {
+        _openmp_info->pop_current_data_environment();
+    }
+
     void Core::loop_handler_pre(TL::PragmaCustomStatement construct,
             Nodecl::NodeclBase loop,
             void (Core::*common_loop_handler)(TL::PragmaCustomStatement,

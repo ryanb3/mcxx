@@ -19,7 +19,6 @@ export CXX="ccache g++"
 # Start timing
 start_time=$SECONDS
 
-
 # config and install nanox runtime library
 cd mcxx
 export MERCURIUM=$PWD/mercurium
@@ -35,7 +34,7 @@ make -j16 >> mcxx_outputlog 2>> mcxx_errorlog
 make install -j16 >> mcxx_outputlog 2>> mcxx_errorlog
 
 # config and install mcxx compiler
-# cd ..
+cd ..
 # Overwrite the log files if they exist
 echo "" > mcxx_outputlog
 echo "" > mcxx_errorlog

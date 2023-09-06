@@ -1927,6 +1927,27 @@ namespace TL { namespace OpenMP {
             _openmp_info->pop_current_data_environment();
     }
 
+    // parallelnew handler
+      void Core::parallelnew_handler_pre(TL::PragmaCustomStatement construct)
+    {
+        if (!in_ompss_mode())
+        {
+            DataEnvironment& data_environment = _openmp_info->get_new_data_environment(construct);
+            _openmp_info->push_current_data_environment(data_environment);
+
+            ObjectList<Symbol> extra_symbols;
+            common_parallel_handler(construct, data_environment, extra_symbols);
+            get_data_extra_symbols(data_environment, extra_symbols);
+        }
+    }
+
+    void Core::parallelnew_handler_post(TL::PragmaCustomStatement construct)
+    {
+        if (!in_ompss_mode())
+            _openmp_info->pop_current_data_environment();
+    }
+    //
+
     void Core::parallel_for_handler_pre(TL::PragmaCustomStatement construct)
     {
         Nodecl::NodeclBase stmt = get_statement_from_pragma(construct);
@@ -2679,6 +2700,7 @@ namespace TL { namespace OpenMP {
     OMP_INVALID_DECLARATION_HANDLER(master)
     OMP_INVALID_DECLARATION_HANDLER(ordered)
     OMP_INVALID_DECLARATION_HANDLER(parallel)
+    OMP_INVALID_DECLARATION_HANDLER(parallelnew)
     OMP_INVALID_DECLARATION_HANDLER(parallel_do)
     OMP_INVALID_DECLARATION_HANDLER(parallel_for)
     OMP_INVALID_DECLARATION_HANDLER(parallel_sections)

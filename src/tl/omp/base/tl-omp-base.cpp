@@ -46,6 +46,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include <functional> 
+
 namespace TL { namespace OpenMP {
 
     namespace Report
@@ -292,6 +294,7 @@ namespace TL { namespace OpenMP {
     OMP_INVALID_DECLARATION_HANDLER(for)
     OMP_INVALID_DECLARATION_HANDLER(master)
     OMP_INVALID_DECLARATION_HANDLER(parallel)
+    OMP_INVALID_DECLARATION_HANDLER(parallelnew)
     OMP_INVALID_DECLARATION_HANDLER(parallel_do)
     OMP_INVALID_DECLARATION_HANDLER(parallel_for)
     OMP_INVALID_DECLARATION_HANDLER(parallel_sections)
@@ -520,12 +523,32 @@ namespace TL { namespace OpenMP {
     void Base::nondeter_handler_pre(TL::PragmaCustomDirective) {
       fprintf(stderr,"Register nondeter pre\n");
     }
+    // void Base::nondeter_handler_post(TL::PragmaCustomDirective directive) {
+    //   fprintf(stderr,"Register nondeter post\n");
+
+    //   /* Create source using C-language */
+    //   Source nondeter_line;
+    //   nondeter_line << "fprintf(stderr,\"I'M IN\");";
+
+    //   /* Parse the source code into Mercurium AST */
+    //   Nodecl::NodeclBase real_code = nondeter_line.parse_statement(directive);
+
+    //   /* Replace this directive by this nice code */
+    //   directive.replace(real_code);
+    // }
+
     void Base::nondeter_handler_post(TL::PragmaCustomDirective directive) {
       fprintf(stderr,"Register nondeter post\n");
 
-      /* Create source using C-language */
+      /* Generate test source code block */
       Source nondeter_line;
-      nondeter_line << "fprintf(stderr,\"I'M IN\");";
+      nondeter_line 
+      << "fprintf(stderr, \"TEST CODE BLOCK INSERTION\\n\");"
+      << "int a = 1;"
+      << "int b = 2;"
+      << "int result = a + b;"  // Calculating the sum
+      << "fprintf(stderr, \"%d\\n\", result);"
+      ;
 
       /* Parse the source code into Mercurium AST */
       Nodecl::NodeclBase real_code = nondeter_line.parse_statement(directive);
@@ -922,6 +945,195 @@ namespace TL { namespace OpenMP {
         pragma_line.diagnostic_unused_clauses();
         directive.replace(parallel_code);
     }
+
+////////AST Value Changer "parallelnew" for Nondeterministic Results///////////
+void Base::parallelnew_handler_pre(TL::PragmaCustomStatement construct)
+{
+    if (_core.in_ompss_mode())
+    {
+        return;
+    }
+
+    // You can add any additional setup or initialization code for the pre-handler here.
+}
+
+void Base::parallelnew_handler_post(TL::PragmaCustomStatement directive)
+{
+    fprintf(stderr, "Entered parallelnew_handler_post\n");
+
+    if (emit_omp_report())
+    {
+        *_omp_report_file
+            << "\n"
+            << directive.get_locus_str() << ": " << "PARALLELNEW construct\n"
+            << directive.get_locus_str() << ": " << "----------------------\n";
+    }
+
+    if (_core.in_ompss_mode())
+    {
+        warn_printf_at(directive.get_locus(),
+                "explicit parallelnew regions do not have any effect in OmpSs\n");
+        directive.replace(directive.get_statements());
+
+        if (emit_omp_report())
+        {
+            *_omp_report_file
+                << OpenMP::Report::indent
+                << "This construct is ignored in OmpSs mode\n";
+        }
+        return;
+    }
+
+    OpenMP::DataEnvironment &ds = _core.get_openmp_info()->get_data_environment(directive);
+    PragmaCustomLine pragma_line = directive.get_pragma_line();
+
+    Nodecl::List execution_environment = this->make_execution_environment(ds,
+            pragma_line, /* ignore_target_info */ false);
+
+    handle_label_clause(directive, execution_environment);
+
+    Nodecl::NodeclBase num_threads;
+    PragmaCustomClause clause = pragma_line.get_clause("num_threads");
+    {
+        ObjectList<Nodecl::NodeclBase> args = clause.get_arguments_as_expressions();
+        if (clause.is_defined() && args.size() == 1) {
+            num_threads = args[0];
+        } else {
+            if (clause.is_defined()) {
+                error_printf_at(directive.get_locus(), "ignoring invalid 'num_threads' clause\n");
+            }
+        }
+    }
+
+    // Print the entire structure of the pragma
+    fprintf(stderr, "Structure of the pragma:\n%s\n", directive.prettyprint().c_str());
+
+    // Declare the AST search lambda function using std::function
+    std::function<void(Nodecl::NodeclBase)> recursive_search_for_test;
+
+    // Define the lambda function
+    recursive_search_for_test = [&](Nodecl::NodeclBase node) {
+        if (node.is_null()) return;
+
+        if (node.is<Nodecl::ObjectInit>()) {
+            TL::Symbol sym = node.get_symbol();
+            if (sym.is_valid() && sym.get_name() == "test" && sym.is_variable() && sym.get_value().is_constant()) {
+                fprintf(stderr, "Found 'test' in the AST.\n");
+                
+                // Get the original value
+                int originalValue = const_value_cast_to_signed_int(sym.get_value().get_constant());
+                
+                // Double the value
+                int newValue = originalValue * 2;
+                
+                // Convert the new value to Nodecl::NodeclBase and set it
+                Nodecl::NodeclBase new_value_nodecl = Nodecl::IntegerLiteral::make(
+                    TL::Type::get_int_type(),
+                    const_value_get_signed_int(newValue),
+                    node.get_locus()
+                );
+                sym.set_value(new_value_nodecl);
+            }
+        }
+
+        Nodecl::NodeclBase::Children children = node.children();
+        for (Nodecl::NodeclBase::Children::iterator it = children.begin(); it != children.end(); ++it) {
+            recursive_search_for_test(*it);
+        }
+    };
+
+    // Call the lambda function starting from the directive node
+    recursive_search_for_test(directive);
+
+    // Extract the statements within the directive
+    Nodecl::List statements = directive.get_statements().as<Nodecl::List>();
+
+    for (Nodecl::List::iterator it = statements.begin(); it != statements.end(); ++it) {
+        Nodecl::NodeclBase statement = *it;
+
+        // Check if the statement is a variable declaration
+        if (statement.is<Nodecl::ObjectInit>()) {
+            TL::Symbol sym = statement.get_symbol();
+
+            // Check if the symbol represents the 'test' variable
+            if (sym.get_name() == "test") {
+                fprintf(stderr, "Detected variable 'test'\n");
+
+                if (sym.is_variable() && sym.get_value().is_constant()) {
+                    // Double the value of the variable
+                    int originalValue = const_value_cast_to_signed_int(sym.get_value().get_constant());
+                    int newValue = originalValue * 2;
+
+                    // Convert the new value to Nodecl::NodeclBase and set it
+                    Nodecl::NodeclBase new_value_nodecl = Nodecl::IntegerLiteral::make(
+                        TL::Type::get_int_type(),
+                        const_value_get_signed_int(newValue),
+                        directive.get_locus()
+                    );
+                    sym.set_value(new_value_nodecl);
+                    fprintf(stderr, "Modified value of 'test' to %d\n", newValue);
+                }
+            }
+        }
+    }
+
+    // Print All Symbols
+    TL::Scope pragma_scope = directive.retrieve_context();
+    ObjectList<TL::Symbol> all_symbols = pragma_scope.get_all_symbols(true);
+    for (TL::Symbol s : all_symbols) {
+        fprintf(stderr, "Symbol: %s\n", s.get_name().c_str());
+    }
+
+    // Check Parent Scopes
+    TL::Scope current_scope = pragma_scope;
+    while (current_scope.is_valid() && current_scope != current_scope.get_global_scope()) {
+        TL::Symbol sym = current_scope.get_symbol_from_name("test");
+        if (sym.is_valid()) {
+            fprintf(stderr, "Found 'test' in a parent scope.\n");
+            break;
+        }
+        
+        if (current_scope.is_class_scope()) {
+            current_scope = current_scope.get_class_of_scope().get_scope();
+        } else {
+            // If we're not in a class scope, we might not be able to move up the scope chain
+            // using the methods we know. For now, break out of the loop.
+            break;
+        }
+    }
+
+    // Since the parallel construct implies a barrier at its end,
+    // there is no need of adding a flush at end, because the barrier implies also a flush
+    execution_environment.append(
+            Nodecl::OpenMP::FlushAtEntry::make(
+                directive.get_locus())
+    );
+    execution_environment.append(
+            Nodecl::OpenMP::FlushAtExit::make(
+                directive.get_locus())
+    );
+
+    // Set implicit barrier at the exit of the combined worksharing
+    execution_environment.append(
+        Nodecl::OpenMP::BarrierAtEnd::make(
+            directive.get_locus()));
+
+    handle_generic_clause_with_one_argument<Nodecl::OpenMP::If>(
+            "if", "It will be executed in parallel if",
+            directive, directive, execution_environment);
+
+    Nodecl::NodeclBase parallel_code = Nodecl::OpenMP::Parallel::make(
+                execution_environment,
+                num_threads,
+                directive.get_statements().shallow_copy(),
+                directive.get_locus());
+
+    pragma_line.diagnostic_unused_clauses();
+    directive.replace(parallel_code);
+}
+
+
+
 
     void Base::single_handler_pre(TL::PragmaCustomStatement) { }
     void Base::single_handler_post(TL::PragmaCustomStatement directive)

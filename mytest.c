@@ -1,10 +1,15 @@
-/* test.c */
-
 #include <stdio.h>
+#include <omp.h>
 
 int main(int argc, char *argv[]) {
 
   #pragma omp nondeter
+
+  #pragma omp parallelnew
+  {
+    int test = 42;
+    printf("Value of test: %d\n", test);
+  }
 
   #pragma omp parallel num_threads(3)
   {

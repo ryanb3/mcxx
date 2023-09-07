@@ -5,7 +5,7 @@ int main(int argc, char *argv[]) {
 
   #pragma omp nondeter
 
-  #pragma omp parallelnew
+  #pragma omp parallelnew num_threads(3)
   {
     int test = 42;
     printf("Value of test: %d\n", test);
